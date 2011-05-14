@@ -33,7 +33,7 @@ class YammerConnection():
                 connection.close()
                 return 'Error listing groups. HTTP Error ' + str(raw.status) + ': ' + str(raw.reason)
 
-    def listUsers(self, token):
+    def listUsers(self, token, pending='false'):
         #Fetch a list of users from the authorized Yammer network.
 
         from json import loads
@@ -44,7 +44,11 @@ class YammerConnection():
         
         count = 1       #for pagination
         while 1:
-            connection.request('GET', '/api/v1/users.json?access_token=' + token + '&page=' + str(count))
+            if pending == 'true':
+                connection.request('GET', '/api/v1/users.json?access_token=' + token + '&page=' + str(count) + '&show_pending=true')
+            else:
+                connection.request('GET', '/api/v1/users.json?access_token=' + token + '&page=' + str(count))
+
             raw = connection.getresponse()
 
             if raw.status == 200: #error handling
