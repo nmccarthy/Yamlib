@@ -4,27 +4,27 @@ class YammerConnection():
         from httplib import HTTPSConnection
         connection = HTTPSConnection('www.yammer.com')
         return connection
-    
+
     def listGroups(self, token):
         #Fetch a list of groups from the authorized Yammer network.
-        
+
         connection = self.open()
-        
+
         groups = []
-        
-        from json import loads
+
+        from simplejson import loads
 
         count=1
         while 1:
             connection.request('GET', '/api/v1/groups.json?access_token=' + token + '&page=' + str(count))
             raw = connection.getresponse()
-        
+
             if raw.status == 200:   #error handling
                 response = raw.read()
                 #print response
                 groups.extend(loads(response))
                 count+=1
-                
+
                 if len(response) < 50:
                     connection.close()
                     return groups
@@ -36,7 +36,7 @@ class YammerConnection():
     def listUsers(self, token, pending='false'):
         #Fetch a list of users from the authorized Yammer network.
 
-        from json import loads
+        from simplejson import loads
 
         connection = self.open()
 
@@ -63,13 +63,37 @@ class YammerConnection():
                 connection.close()
                 return 'Error listing users. HTTP Error ' + str(raw.status) + ': ' + str(raw.reason)
 
+    def listMessages(self, token):
+        #Fetch a list of all messages from the authorized Yammer network.
+
+        from simplejson import loads
+
+        connection = self.open()
+
+        messages = []
+
+        connection.request('GET', '/api/v1/messages.json?access_token=' + token + '&limit=20')
+
+        raw = connection.getresponse()
+
+        if raw.status == 200: #error handling
+            response = raw.read()
+            messages = loads(response)
+            connection.close()
+#            messages.extend(loads(response))
+            return messages
+
+        else:
+            connection.close()
+            return 'Error listing users. HTTP Error ' + str(raw.status) + ': ' + str(raw.reason)
+
     def createGroup(self, token, groupName, private='false', listed='true'):
         #Create a group in Yammer. Pass group name, privacy setting and listing setting.
 
         from urllib import quote
-        
+
         connection = self.open()
-        
+
         groupNameURL = quote(groupName)  #convert group name to acceptable formatting for url
 
         if (private == 'true') & (listed == 'false'):       #private unlisted group
@@ -141,7 +165,7 @@ class YammerConnection():
     def listGroupsByUser(self, token, email):
         #List all the groups that a user is in.
         
-        from json import loads
+        from simplejson import loads
         
         connection = self.open()
 
@@ -160,7 +184,7 @@ class YammerConnection():
     def listSubscriptionsByUser(self, token, userId):
         #List all the people that a user is following. Returns a list of user ids
         
-        from json import loads
+        from simplejson import loads
         
         connection = self.open()
         
@@ -188,7 +212,7 @@ class YammerConnection():
         #List all the followers that a user has.
         #TODO: this doesn't seem to be working correctly. It returns a list that's in the ballpark of the correct quantity, but doesn't match up exactly right with GA
 
-        from json import loads
+        from simplejson import loads
         
         connection = self.open()
         
@@ -220,7 +244,7 @@ class YammerConnection():
             lastId = messages[0]['id']
             return lastId
         
-        from json import loads
+        from simplejson import loads
         
         connection = self.open()
         connection.request('GET', '/api/v1/messages/in_group/' + str(groupId) + '.json?access_token=' + token)
@@ -262,7 +286,7 @@ class YammerConnection():
         
         connection = self.open()
         
-        from json import loads
+        from simplejson import loads
         connection.request('GET', '/api/v1/users/by_email.json?access_token=' + token + '&email=' + email)
         raw = connection.getresponse()
         
@@ -280,7 +304,7 @@ class YammerConnection():
         
         connection = self.open()
         
-        from json import loads
+        from simplejson import loads
         
         connection.request('GET', '/api/v1/users/' + str(userId) + '.json?access_token=' + token)
         raw = connection.getresponse()
@@ -299,7 +323,7 @@ class YammerConnection():
         
         connection = self.open()
         
-        from json import loads
+        from simplejson import loads
         
         connection.request('GET', '/api/v1/oauth/tokens.json?access_token=' + str(token) + '&user_id=' + str(userId) + '&consumer_key=' + cKey)
         raw = connection.getresponse()
@@ -315,14 +339,14 @@ class YammerConnection():
     
     def createOAuth(self, token, userId, cKey):
         #Get a verified OAuth token for a user that will authorize the app that's running
-        
+
         connection = self.open()
-        
-        from json import loads
-        
+
+        from simplejson import loads
+
         connection.request('POST', '/api/v1/oauth.json?access_token=' + str(token) + '&user_id=' + str(userId) + '&consumer_key=' + cKey)
         raw = connection.getresponse()
-        
+
         if raw.status == 200:
             response = raw.read()
             oauth = loads(response)
@@ -330,10 +354,10 @@ class YammerConnection():
         else:
             connection.close()
             return 'Error creating oauth token. HTTP Error ' + str(raw.status) + ': ' + str(raw.reason)
-    
+
     def joinGroup(self, token, groupId):
         #Join the user who's token is passed to a group.
-        
+
         connection = self.open()
         connection.request('POST', '/api/v1/group_memberships.json?access_token=' + token + '&group_id=' + str(groupId))
         raw = connection.getresponse()
@@ -357,4 +381,36 @@ class YammerConnection():
             return 'Message posted.'
         else:
             return 'Error posting message. HTTP Error ' + str(raw.status) + ': ' + str(raw.reason)
+
+    def postGroupMessage(self, token, body, groupId):
+        #Post a message to a Yammer group
+
+        from urllib import quote
+
+        connection = self.open()        
+        connection.request('POST', '/api/v1/messages.json?access_token=' + str(token) + '&body=' + quote(body) + '&group_id=' + str(groupId))
+        raw = connection.getresponse()
+
+        if raw.status == 201:   #error handling
+            return 'Message posted.'
+        else:
+            return 'Error posting group message. HTTP Error ' + str(raw.status) + ': ' + str(raw.reason)
+
+    def postActivityText(self, token, body):
+        #Post an activity to the Yammer feed
+
+        from simplejson import dumps
+        activity = {'type': 'text', 'text': body}
+        activityjson = dumps(activity)
+
+        connection = self.open()
+        connection.request('POST', '/api/v1/streams/activities.json?access_token=' + str(token), activityjson, {'Content-Type': 'application/json'})
+        raw = connection.getresponse()
+
+        return raw.status
+
+#    def getActivity(self, token):
+        #Get the activity stream
+
+#        from simplejson import loads
         
